@@ -22,23 +22,32 @@ def every(step: timedelta, start: datetime | None = None):
 
 def send_report(d: tuple[str], a: tuple[str], h: str):
     b = '\n'.join(f'{c} {s}' for c, da in (('-', d), ('+', a)) for s in sorted(da))
-    text = f'`{h}\n{b}`'
-    response = requests.post(
-        url='https://api.telegram.org/bot{}/sendMessage'.format(TELEGRAM_BOT_TOKEN),
-        data={'chat_id': TELEGRAM_CHAT_ID, 'text': text, 'parse_mode': 'MarkdownV2'},
-    )
-    return response.status_code == 200
+    text = f'`{h}{b}`'
+    try:
+        response = requests.post(
+            url='https://api.telegram.org/bot{}/sendMessage'.format(TELEGRAM_BOT_TOKEN),
+            data={
+                'chat_id': TELEGRAM_CHAT_ID,
+                'text': text,
+                'parse_mode': 'MarkdownV2',
+            },
+        )
+        return response.status_code == 200
+    except:
+        return False
 
 
 is_alive_cmd = ('systemctl', 'is-active', '--quiet')
-header = 'power on self test:'
+header = 'power on self test:\n'
 
-services = {'postgresql', 'docker', 'nessusd'}
+with open('services') as file:
+    services = file.read().split()
 
-reported = set()
-for _ in every(timedelta(minutes=0, seconds=2)):
-    dead = set(s for s in services if run(is_alive_cmd + (s,)).returncode)
-    if header or reported != dead:
-        if send_report(dead - reported, reported - dead, header):
-            reported = dead
-            header = ''
+if __name__ == '__main__':
+    reported = set()
+    for _ in every(timedelta(minutes=1)):
+        dead = set(s for s in services if run(is_alive_cmd + (s,)).returncode)
+        if header or reported != dead:
+            if send_report(dead - reported, reported - dead, header):
+                reported = dead
+                header = ''
