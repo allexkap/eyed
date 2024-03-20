@@ -1,10 +1,9 @@
+import os
 from datetime import datetime, timedelta
 from subprocess import run
 from time import sleep
 
 import requests
-import os
-
 
 TELEGRAM_BOT_TOKEN = os.environ['TELEGRAM_BOT_TOKEN']
 TELEGRAM_CHAT_ID = os.environ['TELEGRAM_CHAT_ID']
@@ -18,6 +17,13 @@ def every(step: timedelta, start: datetime | None = None):
             start += step
             yield
         sleep(1)
+
+
+def run_is_alive(service: str):
+    status = run(
+        ('systemctl', 'is-active', service), capture_output=True, text=True
+    ).stdout.strip()
+    return status in ('active', 'activating', 'reloading')
 
 
 def send_report(d: tuple[str], a: tuple[str], h: str):
@@ -37,16 +43,14 @@ def send_report(d: tuple[str], a: tuple[str], h: str):
         return False
 
 
-is_alive_cmd = ('systemctl', 'is-active', '--quiet')
 header = 'power on self test:\n'
-
 with open('services') as file:
     services = file.read().split()
 
 if __name__ == '__main__':
     reported = set()
     for _ in every(timedelta(minutes=1)):
-        dead = set(s for s in services if run(is_alive_cmd + (s,)).returncode)
+        dead = set(s for s in services if not run_is_alive(s))
         if header or reported != dead:
             if send_report(dead - reported, reported - dead, header):
                 reported = dead
