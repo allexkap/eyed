@@ -19,22 +19,21 @@ def every(step: timedelta, start: datetime | None = None):
         sleep(1)
 
 
-def run_is_alive(service: str):
+def run_is_alive(service: str) -> bool:
     status = run(
         ('systemctl', 'is-active', service), capture_output=True, text=True
     ).stdout.strip()
     return status in ('active', 'activating', 'reloading')
 
 
-def send_report(d: tuple[str], a: tuple[str], h: str):
-    b = '\n'.join(f'{c} {s}' for c, da in (('-', d), ('+', a)) for s in sorted(da))
-    text = f'`{h}{b}`'
+def send_report(d: set[str], a: set[str], header: str) -> bool:
+    text = '\n'.join(f'{ch} {s}' for ch, da in (('-', d), ('+', a)) for s in sorted(da))
     try:
         response = requests.post(
             url='https://api.telegram.org/bot{}/sendMessage'.format(TELEGRAM_BOT_TOKEN),
             data={
                 'chat_id': TELEGRAM_CHAT_ID,
-                'text': text,
+                'text': f'`{header}{text}`',
                 'parse_mode': 'MarkdownV2',
             },
         )
@@ -43,15 +42,18 @@ def send_report(d: tuple[str], a: tuple[str], h: str):
         return False
 
 
-header = 'power on self test:\n'
 with open('services') as file:
-    services = file.read().split()
+    services = set(s for s in file.read().split() if not s.startswith('#'))
 
 if __name__ == '__main__':
+    header = True
     reported = set()
     for _ in every(timedelta(minutes=1)):
         dead = set(s for s in services if not run_is_alive(s))
-        if header or reported != dead:
-            if send_report(dead - reported, reported - dead, header):
+        if header:
+            if send_report(dead, services - dead, 'power on self test:\n'):
+                header = False
                 reported = dead
-                header = ''
+        elif reported != dead:
+            if send_report(dead - reported, reported - dead, ''):
+                reported = dead

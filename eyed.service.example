@@ -4,11 +4,11 @@ StartLimitBurst=5
 
 [Service]
 Type=idle
+Restart=always
+RestartSec=1
 User=rpzw
 WorkingDirectory=/home/rpzw/eyed/
 ExecStart=bash -c 'source keys.sh; exec python eyed.py'
-Restart=Always
-RestartSec=1
 
 [Install]
 WantedBy=multi-user.target
